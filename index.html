@@ -425,7 +425,6 @@ if(sessionStorage.getItem('hs_auth')==='1'){
           <th onclick="quickSort('siteTable',3)">Suitable<span class="sort-icon"></span></th>
           <th onclick="quickSort('siteTable',4)">Unsuitable<span class="sort-icon"></span></th>
           <th onclick="quickSort('siteTable',5)">Suit Rate<span class="sort-icon"></span></th>
-          <th onclick="quickSort('siteTable',6)">High Psych Risk<span class="sort-icon"></span></th>
           <th onclick="quickSort('siteTable',7)">Avg Age<span class="sort-icon"></span></th>
           <th onclick="quickSort('siteTable',8)">Avg Turnaround<span class="sort-icon"></span></th>
         </tr></thead>
@@ -640,6 +639,7 @@ function sortTASite(dir){window._taSiteSortDir=dir;renderTASiteChart(dir);}
 
 function renderAll(){
   Chart.defaults.font.family='DM Sans';
+  const setEl=(id,val)=>{const el=document.getElementById(id);if(el)el.innerHTML=val;};
   const {combined:v,monthBuckets,months}=getFilteredData();
   const labels=months.map(fmtM);
 
@@ -679,7 +679,6 @@ function renderAll(){
   // Screen type summary cards
   const physio=RAW.byScreen?.['Physiotherapist Screen']||{};
   const mdeq=RAW.byScreen?.['Medequest']||{};
-  const setEl=(id,val)=>{const el=document.getElementById(id);if(el)el.innerHTML=val;};
   setEl('scPhysioTotal',(physio.total||0).toLocaleString());
   setEl('scPhysioSuit',(physio.suit_pct||0)+'% suitable · '+((physio.ta&&physio.ta>0)?(physio.ta/24).toFixed(1)+' days median TA':'— days median TA'));
   setEl('scMedTotal',(mdeq.total||0).toLocaleString());
@@ -793,35 +792,10 @@ function renderAll(){
   }).join('');
   posTbody.insertAdjacentHTML('beforeend','<tr class="state-total"><td><strong>Total</strong></td><td>—</td><td>'+posGT+'</td><td>'+posGS+'</td><td>'+(posGT-posGS)+'</td><td>'+pill(posGT?(posGS/posGT*100).toFixed(1):0)+'</td></tr>');
 
-  // ── PSYCHOSOCIAL RISK ──
-  document.getElementById('psychLowN').textContent=(psych.low||0).toLocaleString();
-  document.getElementById('psychLowPct').textContent=pctOf(psych.low||0,psychTot);
-  document.getElementById('psychHighN').textContent=(psych.high||0).toLocaleString();
-  document.getElementById('psychHighPct').textContent=pctOf(psych.high||0,psychTot);
-  // Cross-tab
-    const highTotal=(psych.suit_high||0)+(psych.unsuit_high||0);
-  document.getElementById('ctSuitHigh').textContent=(psych.suit_high||0);
-  document.getElementById('ctSuitHighPct').textContent=highTotal?'('+((psych.suit_high||0)/highTotal*100).toFixed(1)+'%)':'';
-  document.getElementById('ctUnsuitHigh').textContent=(psych.unsuit_high||0);
-  document.getElementById('ctUnsuitHighPct').textContent=highTotal?'('+((psych.unsuit_high||0)/highTotal*100).toFixed(1)+'%)':'';
 
-  dc('chartPsychDist','doughnut',{labels:['Low Risk','High Risk'],datasets:[{data:[psych.low||0,psych.high||0],backgroundColor:[GREEN,RED],borderWidth:0}]},
-    {plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:ctx=>{return ctx.label+': '+ctx.raw+' ('+pctOf(ctx.raw,psychTot)+')';}}}},cutout:'60%'});
-  const psychHighM=monthBuckets.map(b=>b.psych?.high||0);
-  dc('chartPsychTrend','bar',{labels,datasets:[{label:'High Risk',data:psychHighM,backgroundColor:RED,borderRadius:5}]},
-    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'#eef2f5'},ticks:{stepSize:1}}}});
-  dc('chartPsychSuit','bar',{labels:['Low Risk','High Risk'],datasets:[
-    {label:'Suitable',  data:[psych.suit_low||0,  psych.suit_high||0],  backgroundColor:GREEN,stack:'p'},
-    {label:'Unsuitable',data:[psych.unsuit_low||0,psych.unsuit_high||0],backgroundColor:RED,  stack:'p'},
-  ]},{plugins:{legend:{position:'top'}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#eef2f5'}}}});
+  // Psychosocial risk not applicable for this client
 
-  // High psych by site
-  const filtSitesForPsych=RAW.companies.filter(c=>(activeState==='all'||c.state===activeState)&&(activeSite==='all'||c.name===activeSite));
-  const siteHighPsych=filtSitesForPsych.map(c=>({name:shortN(c.name),high:c.psych?.high||0})).filter(c=>c.high>0).sort((a,b)=>b.high-a.high);
-  dc('chartPsychSite','bar',{labels:siteHighPsych.map(c=>c.name),datasets:[{label:'High Risk',data:siteHighPsych.map(c=>c.high),backgroundColor:RED,borderRadius:4}]},
-    {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,grid:{color:'#eef2f5'},ticks:{stepSize:1}},y:{grid:{display:false}}}});
-
-  // ── K10 ──
+    // ── K10 ──
   document.getElementById('k10LowCnt').textContent=(k10.low||0).toLocaleString()+' ('+pctOf(k10.low||0,k10Tot)+')';
   document.getElementById('k10ModCnt').textContent=(k10.moderate||0).toLocaleString()+' ('+pctOf(k10.moderate||0,k10Tot)+')';
   document.getElementById('k10HighCnt').textContent=(k10.high||0).toLocaleString()+' ('+pctOf(k10.high||0,k10Tot)+')';
@@ -873,14 +847,12 @@ function renderAll(){
     });
     const t=mBuckets.reduce((a,b)=>a+(b.total||0),0);
     const s=mBuckets.reduce((a,b)=>a+(b.suitable||0),0);
-    const ph=mBuckets.reduce((a,b)=>a+(b.psych?.high||0),0);
     return{name:c.name,state:c.state,ta:c.ta,age:c.age,total:t,suit:s,unsuitable:t-s,
-      suit_pct:t?+(s/t*100).toFixed(1):0,psych_high:ph};
+      suit_pct:t?+(s/t*100).toFixed(1):0};
   }).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
 
   const grandT=filtSiteRows.reduce((a,b)=>a+b.total,0);
   const grandS=filtSiteRows.reduce((a,b)=>a+b.suit,0);
-  const grandPH=filtSiteRows.reduce((a,b)=>a+b.psych_high,0);
   const siteTbody=document.getElementById('siteTableBody');
   siteTbody.innerHTML=filtSiteRows.map(c=>{
     const avgAge=computeAvgAge(c.age||{});const ta=parseFloat(c.ta);
@@ -888,11 +860,11 @@ function renderAll(){
       +'<td data-sort="'+c.total+'">'+c.total.toLocaleString()+'</td>'
       +'<td>'+c.suit.toLocaleString()+'</td><td>'+c.unsuitable+'</td>'
       +'<td data-sort="'+c.suit_pct+'">'+pill(c.suit_pct)+'</td>'
-      +'<td data-sort="'+c.psych_high+'">'+(c.psych_high>0?'<span class="pill pill-red">'+c.psych_high+'</span>':'—')+'</td>'
+      '
       +'<td data-sort="'+(parseFloat(avgAge)||0)+'">'+avgAge+' yrs</td>'
       +'<td data-sort="'+(ta||0)+'">'+(ta?fmtDaysPlain(ta):'—')+'</td></tr>';
   }).join('');
-  siteTbody.insertAdjacentHTML('beforeend','<tr class="state-total"><td><strong>Total</strong></td><td>—</td><td>'+grandT.toLocaleString()+'</td><td>'+grandS.toLocaleString()+'</td><td>'+(grandT-grandS)+'</td><td>'+pill(grandT?(grandS/grandT*100).toFixed(1):0)+'</td><td>'+(grandPH>0?'<span class="pill pill-red">'+grandPH+'</span>':'—')+'</td><td>'+computeAvgAge(v.age)+' yrs</td><td>—</td></tr>');
+  siteTbody.insertAdjacentHTML('beforeend','<tr class="state-total"><td><strong>Total</strong></td><td>—</td><td>'+grandT.toLocaleString()+'</td><td>'+grandS.toLocaleString()+'</td><td>'+(grandT-grandS)+'</td><td>'+pill(grandT?(grandS/grandT*100).toFixed(1):0)+'</td><td>'+computeAvgAge(v.age)+' yrs</td><td>—</td></tr>');
 }
 
 function initFilters(){
