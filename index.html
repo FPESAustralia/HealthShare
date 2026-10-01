@@ -156,6 +156,8 @@ async function unlock(){
   if(hex==='d2067673f7859068c393d531b8741a8532d47c9d81eb30729caa2c452fd8e2be'){
     document.getElementById('lockScreen').style.display='none';
     sessionStorage.setItem('hs_auth','1');
+    // Re-render now that canvases have real dimensions
+    if(typeof renderAll==='function') renderAll();
   } else {
     document.getElementById('lockErr').textContent='Incorrect passcode. Please try again.';
     document.getElementById('lockInput').value='';
@@ -870,7 +872,11 @@ function initFilters(){
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('prepDate').textContent=new Date().toLocaleDateString('en-AU',{month:'long',year:'numeric'});
   initFilters();
-  renderAll();
+  // Only render immediately if lock screen is already hidden (returning session)
+  const lock=document.getElementById('lockScreen');
+  if(!lock||lock.style.display==='none'||sessionStorage.getItem('hs_auth')==='1'){
+    renderAll();
+  }
 });
 </script>
 </body>
